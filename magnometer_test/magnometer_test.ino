@@ -35,7 +35,7 @@
 
 /* Assign a unique ID to this sensor at the same time */
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
-
+int compassPowerPin = 22; 
 void displaySensorDetails(void)
 {
   sensor_t sensor;
@@ -55,8 +55,8 @@ void displaySensorDetails(void)
 void setup(void) 
 {
   
-  pinMode(30,OUTPUT);
-  digitalWrite(30,HIGH);
+  pinMode(compassPowerPin,OUTPUT);
+  digitalWrite(compassPowerPin,HIGH);
   Serial.begin(9600);
   Serial.println("HMC5883 Magnetometer Test"); Serial.println("");
   
