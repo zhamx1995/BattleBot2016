@@ -6,14 +6,13 @@ AF_DCMotor motor1(1, MOTOR12_64KHZ);
 void setup() {
   Serial.begin(9600);           // set up Serial library at 9600 bps
   Serial.println("Motor test!");
-  
-  motor1.setSpeed(150);     // set the speed to 200/255
+  motor1.setSpeed(250);     // set the speed to 200/255
   motor2.setSpeed(150);
   Serial.print("tick");
   
   motor1.run(FORWARD);      // turn it on going forward
   motor2.run(FORWARD);      // turn it on going forward
-  delay(1000);
+  delay(143000); // broadcast period of 1/7 second
   motor1.run(RELEASE);
   motor2.run(RELEASE);
   

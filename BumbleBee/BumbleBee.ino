@@ -38,6 +38,27 @@ int botsInDanger = 0;
 int nearestBot = -1; // idx of nearest bot in curBotLoc
 int nearerBot = -1; // idx of 2nd nearest bot in curBotLoc
 
+/*
+protection on the edge
+*/
+// avoid from dropping off battlefield
+float X_MIN = 80;
+float X_MAX = 260;
+float X_MID = 170;
+float Y_MIN = 10;
+float Y_MAX = 200;
+float Y_MID = 105;
+int avoidEdge = 0; // 0->avoid xmin; 1->avoid xmax; 2->avoid ymin; 3->avoid ymax
+int SPEED_LOW = 150;
+int SPEED_MID = 200;
+int SPEED_HIGH = 230;
+int SPEED_CUR = 0;
+// values of RTI sensor
+long rctFrontLeft = 0;
+long rctFrontRight = 0;
+long rctBackLeft = 0;
+long rctBackRight = 0;
+
 void setup() {
   Serial.begin(9600);
   Xbee.begin(9600); // initiate communication
@@ -68,10 +89,29 @@ void loop() {
 /* moving algorithm
   
 */
-
-  // if near edge or face obstacle, backward
-  ml.run(BACKWARD);
-  mr.run(BACKWARD);
+  // UNCOMMENT ME: GET_RC_TIME()
+  float distanceToEdge = distToEdge();
+  float distanceToObstacle = distToObstacle();
+  boolean isNearBoundary = nearBoundary(distanceToEdge, distanceToObstacle);
+  if (isNearBoundary) {// if front faces edge or obstacle, backward
+    switch(avoidEdge){
+      case 0:
+        moveToward(X_MID, myLoc[1]);
+        break;
+      case 1:
+        moveToward(X_MID, myLoc[1]);
+        break;
+      case 2:
+        moveToward(Y_MID, myLoc[0]);
+        break;
+      case 3:
+        moveToward(Y_MID, myLoc[0]);
+      default:
+        // moves to center
+        moveToward(X_MID, Y_MID);
+        break;
+    }
+  }
   
   // if 0 or 1 bot in danger circle, move to nearset one
   if(botsInDanger <= 1){
@@ -87,7 +127,7 @@ void loop() {
   // else, run in the opposite direction
   if(botsInDanger == 2){
     // cos(angle) = dotProduct(v1,v2)/(|v1|*|v2|)
-    float cosVal = (v1x*v2x+v1y+v2y)/(sqrt(sq(v1x)+sq(v1y))*sqrt(sq(v2x)+sq(v2y)));
+    float cosVal = (v1x*v2x+v1y*v2y)/(sqrt(sq(v1x)+sq(v1y))*sqrt(sq(v2x)+sq(v2y)));
     // compare cosVal with cos(pi/2) = 0; positive -> less 90 degree, negative -> larger 90 degree
     if(cosVal >= 0){ // attack, move toward nearest bot
       moveToward(curBotLoc[nearestBot][0], curBotLoc[nearestBot][1]);
@@ -126,13 +166,14 @@ void loop() {
 }
 
 
-/*
-void processData(){
-  // if one color is not found, put its location very far
-  
-  // update myVec
-}
-*/
+
+//void processData(){
+//  // if one color is not found, put its location very far
+//  
+//  // update myVec
+//  
+//}
+
 
 void resetLocData(){
   for(int i=0;i<3;i++){
@@ -176,7 +217,75 @@ void findNearest(){
   }
 }
 
+float distToEdge(){
+  float toXMin = myLoc[0] - X_MIN;
+  float toXMax = X_MAX - myLoc[0];
+  float toYMin = myLoc[1] - Y_MIN;
+  float toYMax = Y_MAX - myLoc[1];
+  float result = toXMin;
+  avoidEdge = 0;
+  if (toXMax > result) {
+    result = toXMax;
+    avoidEdge = 1;
+  }
+  if (toYMin > result) {
+    result = toYMin;
+    avoidEdge = 2;
+  }
+  if (toYMax > result) {
+    result = toYMax;
+    avoidEdge = 3;
+  }
+  return result;
+}
+
+float distToObstacle(){
+  //FIX ME
+  return 150.0;
+}
+
+boolean nearBoundary(float dToE, float dToO){ // to edge; to obstacle
+  if (dToE >= 60 || dToO >= 30) SPEED_CUR = SPEED_HIGH;
+  else if (dToE >= 16 || dToO >= 16) SPEED_CUR = SPEED_MID;
+  else {
+    SPEED_CUR = SPEED_LOW;
+    return true;
+  }
+  return false;
+}
+
 // myBot moves from myLoc(X,Y) to (targetX, targetY), while currently facing myVec(Vx,Vy)
 void moveToward(float targetX, float targetY){
+  float targetVec[2] = {targetX-myLoc[0], targetY-myLoc[1]};
+  float v1x = myVec[0];
+  float v1y = myVec[1];
+  float v2x = targetVec[0];
+  float v2y = targetVec[1];
+  float cosVal = (v1x*v2x+v1y*v2y)/(sqrt(sq(v1x)+sq(v1y))*sqrt(sq(v2x)+sq(v2y)));
+  if (cosVal >= 0.98) { // theta <= 10 degree, move straight forward
+    ml.setSpeed(SPEED_CUR);
+    mr.setSpeed(SPEED_CUR);
+    ml.run(BACKWARD);
+    mr.run(BACKWARD);
+  } else if (cosVal < 0.98 && cosVal >= -0.5) { // turn right or left between 10-120 degree
+    // sin(theta) = cross product (v1, v2)/(|v1| * |v2|), cross(v1,v2) = v1x*v2y-v1y*v2x
+    float sinVal = (v1x*v2y - v1y*v2x)/(sqrt(sq(v1x)+sq(v1y))*sqrt(sq(v2x)+sq(v2y)));
+    if (sinVal > 0) { // turn left
+      ml.setSpeed(SPEED_CUR);
+      mr.setSpeed(250);
+      ml.run(BACKWARD);
+      mr.run(BACKWARD);
+    } else { // turn right
+      ml.setSpeed(250);
+      mr.setSpeed(SPEED_CUR);
+      ml.run(BACKWARD);
+      mr.run(BACKWARD);
+    }
+  } else { // theta >= 120 degree, turn around
+    ml.setSpeed(SPEED_CUR);
+    mr.setSpeed(SPEED_CUR);
+    ml.run(FORWARD);
+    mr.run(BACKWARD);
+  }
   
 }
