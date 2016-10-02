@@ -78,15 +78,15 @@ void loop() {
     moveToward(curBotLoc[nearestBot][0],curBotLoc[nearestBot][1]);
   }
   
+  float v1x = meToEnemy[nearestBot][0];
+  float v1y = meToEnemy[nearestBot][1];
+  float v2x = meToEnemy[nearerBot][0];
+  float v2y = meToEnemy[nearerBot][1];
   // if 2 in danger circle; 
   // if they are close (angle of enemy1,me,enemy2 less than pi/2), move towards
   // else, run in the opposite direction
   if(botsInDanger == 2){
     // cos(angle) = dotProduct(v1,v2)/(|v1|*|v2|)
-    float v1x = meToEnemy[nearestBot][0];
-    float v1y = meToEnemy[nearestBot][1];
-    float v2x = meToEnemy[nearerBot][0];
-    float v2y = meToEnemy[nearerBot][1];
     float cosVal = (v1x*v2x+v1y+v2y)/(sqrt(sq(v1x)+sq(v1y))*sqrt(sq(v2x)+sq(v2y)));
     // compare cosVal with cos(pi/2) = 0; positive -> less 90 degree, negative -> larger 90 degree
     if(cosVal >= 0){ // attack, move toward nearest bot
@@ -103,7 +103,25 @@ void loop() {
   // if I am in the circle, run
   // if I am out of the circle, move towards nearest
   else{
+    float Px = myLoc[0];
+    float Py = myLoc[1];
+    float Ax = curBotLoc[0][0];
+    float Ay = curBotLoc[0][1];
+    float Bx = curBotLoc[1][0];
+    float By = curBotLoc[1][1];
+    float Cx = curBotLoc[2][0];
+    float Cy = curBotLoc[2][1];
+    float M = ((Py-Cy)*(Cx-Bx)+(Cy-By)*(Cx-Px))/((By-Ay)*(Cx-Bx)-(Cy-By)*(Px-Ax));
     
+    if (M >= 0) { // P is out of Triangle_ABC, attack nearest
+      moveToward(curBotLoc[nearestBot][0], curBotLoc[nearestBot][1]);      
+    } else { // P is in Triangle_ABC, ignore farthest, and escape from the other two
+      float midPointX = v1x+(v2x-v1x)/2;
+      float midPointY = v1y+(v2y-v1y)/2;
+      float targetX = 2*myLoc[0] - midPointX;
+      float targetY = 2*myLoc[1] - midPointY;
+      moveToward(targetX, targetY);
+    }
   }
 }
 
