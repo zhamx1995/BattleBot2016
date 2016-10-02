@@ -14,6 +14,13 @@ const int myColor = 2;
 
 // Battle round and obstacle settings
 const int ROUND = 1; // frist round, semi, and finals
+const int obstX = 170;
+const int obstYa = 200;
+const int obstYb = 137;
+const int obst2X = 170;
+const int obst2Ya = 10;
+const int obst2Yb = 74;
+float avoidObst[2] = {0,0};
 
 
 float myLoc[2] = {0,0}; // my current location
@@ -41,6 +48,8 @@ const float Y_MIN = 10;
 const float Y_MAX = 200;
 const float Y_MID = 105;
 int avoidEdge = 0; // 0->avoid xmin; 1->avoid xmax; 2->avoid ymin; 3->avoid ymax
+// 4->avoid obstacle
+float 
 const int SPEED_LOW = 100;
 const int SPEED_MID = 190;
 const int SPEED_HIGH = 220;
@@ -116,7 +125,7 @@ void loop() {
     // update velocity
     for(int i=0;i<3;i++){ // ith bot
       for(int j=0;j<2;j++){ // j=0 for X, j=1 for Y
-        botVec[i][j] = curBotLoc[i][j] - prevBotLoc[i][j];
+//        botVec[i][j] = curBotLoc[i][j] - prevBotLoc[i][j];
         meToEnemy[i][j] = curBotLoc[i][j] - myLoc[j];
       }
     }
@@ -136,6 +145,10 @@ void loop() {
           break;
         case 3:
           moveToward(Y_MID, myLoc[0]);
+          break;
+        case 4:
+          moveToward(avoidObst[0],avoidObst[1]);
+          break;
         default:
           // moves to center
           moveToward(X_MID, Y_MID);
@@ -296,8 +309,38 @@ float distToEdge(){
 
 float distToObstacle(){
   if (ROUND == 1) return 150.0;
-  else if (ROUND == 2) {
-    
+  else if (ROUND == 2) { // in round 2, only 1 obstacle
+    if (myLoc[1] >= obstYb) { // nearest intersection (obstX, myLoc[1])
+      float result = obstX - myLoc[0];
+      avoidObst[1] = myLoc[1];
+      avoidObst[0] = 2*myLoc[0] - obstX;
+      if (result < 0) return -result;
+      return result;
+    } else {
+      // nearest intersection (obstX, obstYb)
+      avoidObst[0] = 2*myLoc[0] - obstX;
+      avoidObst[1] = 2*myLoc[1] - obstYb;
+      return sqrt(sq(obstX - myLoc[0])+sq(obstYb - myLoc[1]));
+    }
+  } else { // ROUND == 3
+      if (myLoc[1] >= obstYb || myLoc[1] <= obst2Yb) { 
+      // nearest intersection (obstX, myLoc[1]) with obst1 or obst2
+      float result = obstX - myLoc[0];
+      avoidObst[1] = myLoc[1];
+      avoidObst[0] = 2*myLoc[0] - obstX;
+      if (result < 0) return -result;
+      return result;
+    } else if (myLoc[1] >= Y_MID) {
+      // nearest intersection (obstX, obstYb) with obst1
+      avoidObst[0] = 2*myLoc[0] - obstX;
+      avoidObst[1] = 2*myLoc[1] - obstYb;
+      return sqrt(sq(obstX - myLoc[0])+sq(obstYb - myLoc[1]));
+    } else {
+      // nearest intersection (obstX, obst2Yb) with obst2
+      avoidObst[0] = 2*myLoc[0] - obstX;
+      avoidObst[1] = 2*myLoc[1] - obst2Yb;
+      return sqrt(sq(obstX - myLoc[0])+sq(obst2Yb - myLoc[1]));
+    }
   }
 }
 
@@ -319,6 +362,9 @@ boolean nearBoundary(float dToE, float dToO){ // to edge; to obstacle
   }
   else {
     Serial.println("near edge, moving cautiously");
+    if (dToO < dToE) {
+      avoidEdge = 4;
+    }
     SPEED_CUR = SPEED_LOW;
     return true;
   }
