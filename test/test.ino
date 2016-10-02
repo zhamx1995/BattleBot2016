@@ -9,11 +9,13 @@ void setup() {
   
   motor1.setSpeed(150);     // set the speed to 200/255
   motor2.setSpeed(150);
-   Serial.print("tick");
+  Serial.print("tick");
   
   motor1.run(FORWARD);      // turn it on going forward
   motor2.run(FORWARD);      // turn it on going forward
   delay(1000);
+  motor1.run(RELEASE);
+  motor2.run(RELEASE);
   
 }
 
