@@ -1,17 +1,20 @@
-//Pin summary:
+
 #include <AFMotor.h>
 #include "ChinaBee.h"
 #include <SPI.h>
-
 //computer vision
 ChinaBee bee;
 
-
+//Pin summary:
 //NOTE FOR THE MOTORS: LEFT IS RIGHT, FORWARD IS BACKWARD
 AF_DCMotor ml(2, MOTOR12_64KHZ); // motor left
 AF_DCMotor mr(1, MOTOR12_64KHZ); // motor right
 // REMEMBER TO CHANGE BEFORE BATTLE
 const int myColor = 2;
+
+// Battle round and obstacle settings
+const int ROUND = 1; // frist round, semi, and finals
+
 
 float myLoc[2] = {0,0}; // my current location
 float myVec[2] = {0,0}; // my current direction
@@ -31,21 +34,17 @@ int nearerBot = -1; // idx of 2nd nearest bot in curBotLoc
 protection on the edge
 */
 // avoid from dropping off battlefield
-float X_MIN = 80;
-float X_MAX = 260;
-float X_MID = 170;
-float Y_MIN = 10;
-float Y_MAX = 200;
-float Y_MID = 105;
+const float X_MIN = 80;
+const float X_MAX = 260;
+const float X_MID = 170;
+const float Y_MIN = 10;
+const float Y_MAX = 200;
+const float Y_MID = 105;
 int avoidEdge = 0; // 0->avoid xmin; 1->avoid xmax; 2->avoid ymin; 3->avoid ymax
-int SPEED_LOW = 150;
-int SPEED_MID = 200;
-int SPEED_HIGH = 230;
+const int SPEED_LOW = 100;
+const int SPEED_MID = 190;
+const int SPEED_HIGH = 220;
 int SPEED_CUR = 0;
-
-//testing variables
-//int loopNum = 1;
-
 //IR parameters
 const int IRcount = 4;
 int IRpin[] = {38,39,40,41}; //frontleft,frontright,rearright,rearleft
@@ -69,45 +68,49 @@ void setup() {
 }
 
 void loop() {
-  delay(150);
-/* update enemy moving data
-*/
-  //
-//  Serial.print("Entering loop for the ");
-//  Serial.print(loopNum);
-//  Serial.println(" time.");
-//  loopNum++;
-  //IR stuff
+  //use different delay times for different operation 
+  //for optimal performance
+  //Edge detection by IR sensors
   if(IRonEdge())
   {
+    Serial.println("One or more of the IR sensors have detected danger");
     if(!IRActive[0] && !IRActive[1] && (IRActive[2] || IRActive[3]))
     {
-      //move forward
       moveForward();
+      delay(150);
     }
     else if(!IRActive[0] && IRActive[1])
     {
-      // turn left
+      moveBackward();
+      delay(100);
       turnLeft();
+      delay(100);
     }
     else if(IRActive[0] && !IRActive[1])
     {
-     //turn right 
+      moveBackward();
+      delay(100); 
      turnRight();
+     delay(100);
     }
     else if(IRActive[0] && IRActive[1] && !IRActive[2])
     {
-     //turn right 
+      moveBackward();
+      delay(150); 
      turnRight();
+     delay(100);
     }
     else
     {
-     //turn left 
+      moveBackward();
+      delay(150);
      turnLeft();
+     delay(100);
     }
   }
   else
   {
+    /* update enemy moving data */
     // get location data from broadcast
     processData();
     // update velocity
@@ -190,7 +193,9 @@ void loop() {
         moveToward(targetX, targetY);
       }
     }
+    delay(150);
   }
+  
 }
 
 
@@ -209,8 +214,8 @@ void processData(){
         // update myVec
         myVec[0] = stat->x - myLoc[0];
         myVec[1] = stat->y - myLoc[1];
-        myLoc[0] = stat->x;
         // update myLoc
+        myLoc[0] = stat->x;
         myLoc[1] = stat->y;
       }
       else
@@ -219,12 +224,11 @@ void processData(){
        if (stat->x == 0){
          curBotLoc[count][0] = 1000;
          curBotLoc[count][1] = 1000;
-         count++;
        } else {
          curBotLoc[count][0] = stat->x;
          curBotLoc[count][1] = stat->y;
-         count++;
        }
+       count++;
       }
       Serial.print("Team ");
       Serial.print(i);
@@ -234,7 +238,6 @@ void processData(){
       Serial.print(stat->y);
       Serial.print(" time since (ms): ");
       Serial.println(millis() - stat->timestamp);
-      
     }
   }
 }
@@ -250,11 +253,13 @@ void findNearest(){
   float secondMin = 9000;
   for(int i=0; i<3; i++){
     if (botDist[i] < minDist) {
+     secondMin = minDist;
     minDist = botDist[i];
-      secondMin = minDist;
       nearerBot = nearestBot;
       nearestBot = i;
-   Serial.print("Distance for bot i is ");
+   Serial.print("Distance for bot ");
+   Serial.print(i);
+   Serial.print(" is ");
   Serial.println(botDist[i]);
     }
     else if (botDist[i] < secondMin) {
@@ -263,9 +268,8 @@ void findNearest(){
     }
     if (botDist[i] < dangerR) botsInDanger = botsInDanger + 1;
   }
-//  Serial.print("Nearest is ");
-//  Serial.print(nearestBot);
-//  Serial.print("");
+  Serial.print("Nearest is ");
+  Serial.print(nearestBot);
 }
 
 float distToEdge(){
@@ -291,15 +295,30 @@ float distToEdge(){
 }
 
 float distToObstacle(){
-  //FIX ME
-  return 150.0;
+  if (ROUND == 1) return 150.0;
+  else if (ROUND == 2) {
+    
+  }
 }
 
 boolean nearBoundary(float dToE, float dToO){ // to edge; to obstacle
-  if (myLoc[0] < 0.5 && myLoc[1] < 0.5) SPEED_CUR = SPEED_LOW;
-  else if (dToE >= 60 && dToO >= 30) SPEED_CUR = SPEED_HIGH;
-  else if (dToE >= 16 && dToO >= 16) SPEED_CUR = SPEED_MID;
+  if (myLoc[0] < 0.5 && myLoc[1] < 0.5)
+ { 
+   Serial.println("broadcast down, moving cautiously");
+   SPEED_CUR = SPEED_LOW;
+ }
+  else if (dToE >= 60 && dToO >= 30) 
+  {
+    Serial.println("Center of field, moving full speed");
+    SPEED_CUR = SPEED_HIGH;
+  }
+  else if (dToE >= 16 && dToO >= 16) 
+  {
+    SPEED_CUR = SPEED_MID;
+    Serial.println("between center and edge, moving moderately");
+  }
   else {
+    Serial.println("near edge, moving cautiously");
     SPEED_CUR = SPEED_LOW;
     return true;
   }
@@ -316,38 +335,23 @@ void moveToward(float targetX, float targetY){
   float cosVal = (v1x*v2x+v1y*v2y)/(sqrt(sq(v1x)+sq(v1y))*sqrt(sq(v2x)+sq(v2y)));
   if (cosVal >= 0.98) { // theta <= 10 degree, move straight forward
     moveForward();
-//    ml.setSpeed(SPEED_CUR);
-//    mr.setSpeed(SPEED_CUR);
-//    ml.run(BACKWARD);
-//    mr.run(FORWARD);
   } else if (cosVal < 0.98 && cosVal >= -0.5) { // turn right or left between 10-120 degree
     // sin(theta) = cross product (v1, v2)/(|v1| * |v2|), cross(v1,v2) = v1x*v2y-v1y*v2x
     float sinVal = (v1x*v2y - v1y*v2x)/(sqrt(sq(v1x)+sq(v1y))*sqrt(sq(v2x)+sq(v2y)));
     if (sinVal > 0) { // turn left
       turnLeft();
-//      ml.setSpeed(SPEED_CUR);
-//      mr.setSpeed(250);
-//      ml.run(BACKWARD);
-//      mr.run(FORWARD);
-    } else { // turn right
+    } else if (sinVal < 0) { // turn right
       turnRight();
-//      ml.setSpeed(250);
-//      mr.setSpeed(SPEED_CUR);
-//      ml.run(BACKWARD);
-//      mr.run(FORWARD);
     }
   } else { // theta >= 120 degree
     if(v1x == 0 &&v1y == 0)
     {
      //didn't get own direction, move forwared regardlessly
+     moveForward();
     }
     else{
       //turn around
       turnAround();
-//    ml.setSpeed(SPEED_CUR);
-//    mr.setSpeed(SPEED_CUR);
-//    ml.run(FORWARD);
-//    mr.run(FORWARD);
     }
   }
   
@@ -380,17 +384,17 @@ void moveForward(){
 }
 void turnLeft(){
   Serial.println("Turning left");
-  ml.setSpeed(SPEED_CUR);
-  mr.setSpeed(250);
+  ml.setSpeed(255);
+  mr.setSpeed(255);
   ml.run(BACKWARD);
   mr.run(FORWARD);
 }
 void turnRight(){
   Serial.println("Turning right");
-      ml.setSpeed(250);
-      mr.setSpeed(SPEED_CUR);
-      ml.run(BACKWARD);
-      mr.run(FORWARD);
+      ml.setSpeed(255);
+      mr.setSpeed(255);
+      ml.run(FORWARD);
+      mr.run(BACKWARD);
 }
 void turnAround(){
     Serial.print("turning around");
@@ -398,8 +402,8 @@ void turnAround(){
 }
 void moveBackward(){
     Serial.println("Moving backward");
-    ml.setSpeed(SPEED_CUR);
-    mr.setSpeed(SPEED_CUR);
+    ml.setSpeed(255);
+    mr.setSpeed(255);
     ml.run(FORWARD);
     mr.run(FORWARD);
 }
